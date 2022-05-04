@@ -1,0 +1,104 @@
+[
+    {
+        "label":  "Details",
+        "fields":  [
+                       {
+                           "key":  "email",
+                           "templateOptions":  {
+                                                   "label":  "Email",
+                                                   "placeholder":  "max.muster@domain.de",
+                                                   "required":  true
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "company",
+                           "templateOptions":  {
+                                                   "label":  "Company",
+                                                   "required":  false,
+                                                   "useObjects":  false,
+                                                   "useDataSource":  false,
+                                                   "useFilter":  false,
+                                                   "options":  [
+                                                                   "MAN",
+                                                                   "MAN Digitalhub"
+                                                               ]
+                                               },
+                           "type":  "dropdown",
+                           "summaryVisibility":  "Show",
+                           "textOrLabel":  "text",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "givenname",
+                           "templateOptions":  {
+                                                   "label":  "Givenname",
+                                                   "placeholder":  "John",
+                                                   "required":  true,
+                                                   "minLength":  2
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "lastname",
+                           "templateOptions":  {
+                                                   "label":  "Last name",
+                                                   "placeholder":  "Poel",
+                                                   "required":  true,
+                                                   "minLength":  2
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "title",
+                           "templateOptions":  {
+                                                   "label":  "Job title",
+                                                   "placeholder":  "Application owner"
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "department",
+                           "templateOptions":  {
+                                                   "label":  "Department",
+                                                   "placeholder":  "ICT"
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       },
+                       {
+                           "key":  "mobile",
+                           "templateOptions":  {
+                                                   "label":  "Mobile Phone Number",
+                                                   "required":  true
+                                               },
+                           "type":  "input",
+                           "summaryVisibility":  "Show",
+                           "requiresTemplateOptions":  true,
+                           "requiresKey":  true,
+                           "requiresDataSource":  false
+                       }
+                   ]
+    }
+]
