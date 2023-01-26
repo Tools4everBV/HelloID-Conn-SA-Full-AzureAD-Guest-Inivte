@@ -1,12 +1,11 @@
 # Set TLS to accept TLS, TLS 1.1 and TLS 1.2
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
-
 #HelloID variables
 #Note: when running this script inside HelloID; portalUrl and API credentials are provided automatically (generate and save API credentials first in your admin panel!)
 $portalUrl = "https://CUSTOMER.helloid.com"
 $apiKey = "API_KEY"
 $apiSecret = "API_SECRET"
-$delegatedFormAccessGroupNames = @("Users") #Only unique names are supported. Groups must exist!
+$delegatedFormAccessGroupNames = @("") #Only unique names are supported. Groups must exist!
 $delegatedFormCategories = @("Azure Active Directory","User Management") #Only unique names are supported. Categories will be created if not exists
 $script:debugLogging = $false #Default value: $false. If $true, the HelloID resource GUIDs will be shown in the logging
 $script:duplicateForm = $false #Default value: $false. If $true, the HelloID resource names will be changed to import a duplicate Form
@@ -21,15 +20,16 @@ $tmpName = @'
 AADAppId
 '@ 
 $tmpValue = @'
+b9efea7a-99c5-4c07-a65c-3d4013299ecf
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
-#Global variable #2 >> companyName
+#Global variable #2 >> AADAppSecret
 $tmpName = @'
-companyName
+AADAppSecret
 '@ 
 $tmpValue = @'
-{{company.name}}
+5rN8Q~WTYJ1arFUsQtIc9VOKiSZAvkjSkgXBCaKN
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
@@ -38,21 +38,22 @@ $tmpName = @'
 AADtenantID
 '@ 
 $tmpValue = @'
+6c10d9ab-94c2-44b2-8019-39473bdd3be8
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
-#Global variable #4 >> AADAppSecret
+#Global variable #4 >> companyName
 $tmpName = @'
-AADAppSecret
+companyName
 '@ 
 $tmpValue = @'
+{{company.name}}
 '@ 
 $globalHelloIDVariables.Add([PSCustomObject]@{name = $tmpName; value = $tmpValue; secret = "False"});
 
 
 #make sure write-information logging is visual
 $InformationPreference = "continue"
-
 # Check for prefilled API Authorization header
 if (-not [string]::IsNullOrEmpty($portalApiBasic)) {
     $script:headers = @{"authorization" = $portalApiBasic}
@@ -66,7 +67,6 @@ if (-not [string]::IsNullOrEmpty($portalApiBasic)) {
     $script:headers = @{"authorization" = $Key}
     Write-Information "Using manual API credentials"
 }
-
 # Check for prefilled PortalBaseURL
 if (-not [string]::IsNullOrEmpty($portalBaseUrl)) {
     $script:PortalBaseUrl = $portalBaseUrl
@@ -75,10 +75,8 @@ if (-not [string]::IsNullOrEmpty($portalBaseUrl)) {
     $script:PortalBaseUrl = $portalUrl
     Write-Information "Using manual PortalURL: $script:PortalBaseUrl"
 }
-
 # Define specific endpoint URI
 $script:PortalBaseUrl = $script:PortalBaseUrl.trim("/") + "/"  
-
 # Make sure to reveive an empty array using PowerShell Core
 function ConvertFrom-Json-WithEmptyArray([string]$jsonString) {
     # Running in PowerShell Core?
@@ -90,16 +88,13 @@ function ConvertFrom-Json-WithEmptyArray([string]$jsonString) {
         return ,$r  # Force return value to be an array using a comma
     }
 }
-
 function Invoke-HelloIDGlobalVariable {
     param(
         [parameter(Mandatory)][String]$Name,
         [parameter(Mandatory)][String][AllowEmptyString()]$Value,
         [parameter(Mandatory)][String]$Secret
     )
-
     $Name = $Name + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
-
     try {
         $uri = ($script:PortalBaseUrl + "api/v1/automation/variables/named/$Name")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
@@ -117,7 +112,6 @@ function Invoke-HelloIDGlobalVariable {
             $uri = ($script:PortalBaseUrl + "api/v1/automation/variable")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $variableGuid = $response.automationVariableGuid
-
             Write-Information "Variable '$Name' created$(if ($script:debugLogging -eq $true) { ": " + $variableGuid })"
         } else {
             $variableGuid = $response.automationVariableGuid
@@ -127,7 +121,6 @@ function Invoke-HelloIDGlobalVariable {
         Write-Error "Variable '$Name', message: $_"
     }
 }
-
 function Invoke-HelloIDAutomationTask {
     param(
         [parameter(Mandatory)][String]$TaskName,
@@ -141,7 +134,6 @@ function Invoke-HelloIDAutomationTask {
     )
     
     $TaskName = $TaskName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
-
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/automationtasks?search=$TaskName&container=$AutomationContainer")
         $responseRaw = (Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false) 
@@ -149,7 +141,6 @@ function Invoke-HelloIDAutomationTask {
     
         if([string]::IsNullOrEmpty($response.automationTaskGuid) -or $ForceCreateTask -eq $true) {
             #Create Task
-
             $body = @{
                 name                = $TaskName;
                 useTemplate         = $UseTemplate;
@@ -163,7 +154,6 @@ function Invoke-HelloIDAutomationTask {
             $uri = ($script:PortalBaseUrl +"api/v1/automationtasks/powershell")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
             $taskGuid = $response.automationTaskGuid
-
             Write-Information "Powershell task '$TaskName' created$(if ($script:debugLogging -eq $true) { ": " + $taskGuid })"
         } else {
             #Get TaskGUID
@@ -173,10 +163,8 @@ function Invoke-HelloIDAutomationTask {
     } catch {
         Write-Error "Powershell task '$TaskName', message: $_"
     }
-
     $returnObject.Value = $taskGuid
 }
-
 function Invoke-HelloIDDatasource {
     param(
         [parameter(Mandatory)][String]$DatasourceName,
@@ -188,9 +176,7 @@ function Invoke-HelloIDDatasource {
         [parameter()][String][AllowEmptyString()]$AutomationTaskGuid,
         [parameter(Mandatory)][Ref]$returnObject
     )
-
     $DatasourceName = $DatasourceName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
-
     $datasourceTypeName = switch($DatasourceType) { 
         "1" { "Native data source"; break} 
         "2" { "Static data source"; break} 
@@ -228,10 +214,8 @@ function Invoke-HelloIDDatasource {
     } catch {
       Write-Error "$datasourceTypeName '$DatasourceName', message: $_"
     }
-
     $returnObject.Value = $datasourceGuid
 }
-
 function Invoke-HelloIDDynamicForm {
     param(
         [parameter(Mandatory)][String]$FormName,
@@ -240,7 +224,6 @@ function Invoke-HelloIDDynamicForm {
     )
     
     $FormName = $FormName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
-
     try {
         try {
             $uri = ($script:PortalBaseUrl +"api/v1/forms/$FormName")
@@ -269,16 +252,13 @@ function Invoke-HelloIDDynamicForm {
     } catch {
         Write-Error "Dynamic form '$FormName', message: $_"
     }
-
     $returnObject.Value = $formGuid
 }
-
-
 function Invoke-HelloIDDelegatedForm {
     param(
         [parameter(Mandatory)][String]$DelegatedFormName,
         [parameter(Mandatory)][String]$DynamicFormGuid,
-        [parameter()][String][AllowEmptyString()]$AccessGroups,
+        [parameter()][Array][AllowEmptyString()]$AccessGroups,
         [parameter()][String][AllowEmptyString()]$Categories,
         [parameter(Mandatory)][String]$UseFaIcon,
         [parameter()][String][AllowEmptyString()]$FaIcon,
@@ -287,7 +267,6 @@ function Invoke-HelloIDDelegatedForm {
     )
     $delegatedFormCreated = $false
     $DelegatedFormName = $DelegatedFormName + $(if ($script:duplicateForm -eq $true) { $script:duplicateFormSuffix })
-
     try {
         try {
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms/$DelegatedFormName")
@@ -302,11 +281,15 @@ function Invoke-HelloIDDelegatedForm {
                 name            = $DelegatedFormName;
                 dynamicFormGUID = $DynamicFormGuid;
                 isEnabled       = "True";
-                accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
                 useFaIcon       = $UseFaIcon;
                 faIcon          = $FaIcon;
                 task            = ConvertFrom-Json -inputObject $task;
-            }    
+            }
+            if(-not[String]::IsNullOrEmpty($AccessGroups)) { 
+                $body += @{
+                    accessGroups    = (ConvertFrom-Json-WithEmptyArray($AccessGroups));
+                }
+            }
             $body = ConvertTo-Json -InputObject $body -Depth 100
     
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms")
@@ -315,7 +298,6 @@ function Invoke-HelloIDDelegatedForm {
             $delegatedFormGuid = $response.delegatedFormGUID
             Write-Information "Delegated form '$DelegatedFormName' created$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormGuid })"
             $delegatedFormCreated = $true
-
             $bodyCategories = $Categories
             $uri = ($script:PortalBaseUrl +"api/v1/delegatedforms/$delegatedFormGuid/categories")
             $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $bodyCategories
@@ -328,11 +310,9 @@ function Invoke-HelloIDDelegatedForm {
     } catch {
         Write-Error "Delegated form '$DelegatedFormName', message: $_"
     }
-
     $returnObject.value.guid = $delegatedFormGuid
     $returnObject.value.created = $delegatedFormCreated
 }
-
 
 <# Begin: HelloID Global Variables #>
 foreach ($item in $globalHelloIDVariables) {
@@ -345,7 +325,7 @@ foreach ($item in $globalHelloIDVariables) {
 
 <# Begin: Dynamic Form "AzureAD Guest - Create - Clone" #>
 $tmpSchema = @"
-[{"label":"Details","fields":[{"key":"email","templateOptions":{"label":"Email","placeholder":"max.muster@domain.de","required":true},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"company","templateOptions":{"label":"Company","required":false,"useObjects":false,"useDataSource":false,"useFilter":false,"options":["MAN","MAN Digitalhub"]},"type":"dropdown","summaryVisibility":"Show","textOrLabel":"text","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"givenname","templateOptions":{"label":"Givenname","placeholder":"John","required":true,"minLength":2},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"lastname","templateOptions":{"label":"Last name","placeholder":"Poel","required":true,"minLength":2},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"title","templateOptions":{"label":"Job title","placeholder":"Application owner"},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"department","templateOptions":{"label":"Department","placeholder":"ICT"},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"mobile","templateOptions":{"label":"Mobile Phone Number","required":true},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
+[{"label":"Details","fields":[{"key":"email","templateOptions":{"label":"Email","placeholder":"user@domain.com","required":true},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"givenname","templateOptions":{"label":"Givenname","placeholder":"John","required":true,"minLength":2},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false},{"key":"lastname","templateOptions":{"label":"Last name","placeholder":"Poel","required":true,"minLength":2},"type":"input","summaryVisibility":"Show","requiresTemplateOptions":true,"requiresKey":true,"requiresDataSource":false}]}]
 "@ 
 
 $dynamicFormGuid = [PSCustomObject]@{} 
@@ -357,25 +337,30 @@ Invoke-HelloIDDynamicForm -FormName $dynamicFormName -FormSchema $tmpSchema  -re
 
 <# Begin: Delegated Form Access Groups and Categories #>
 $delegatedFormAccessGroupGuids = @()
-foreach($group in $delegatedFormAccessGroupNames) {
-    try {
-        $uri = ($script:PortalBaseUrl +"api/v1/groups/$group")
-        $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
-        $delegatedFormAccessGroupGuid = $response.groupGuid
-        $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
-        
-        Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
-    } catch {
-        Write-Error "HelloID (access)group '$group', message: $_"
+if(-not[String]::IsNullOrEmpty($delegatedFormAccessGroupNames)){
+    foreach($group in $delegatedFormAccessGroupNames) {
+        try {
+            $uri = ($script:PortalBaseUrl +"api/v1/groups/$group")
+            $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
+            $delegatedFormAccessGroupGuid = $response.groupGuid
+            $delegatedFormAccessGroupGuids += $delegatedFormAccessGroupGuid
+            
+            Write-Information "HelloID (access)group '$group' successfully found$(if ($script:debugLogging -eq $true) { ": " + $delegatedFormAccessGroupGuid })"
+        } catch {
+            Write-Error "HelloID (access)group '$group', message: $_"
+        }
+    }
+    if($null -ne $delegatedFormAccessGroupGuids){
+        $delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Depth 100 -Compress)
     }
 }
-$delegatedFormAccessGroupGuids = ($delegatedFormAccessGroupGuids | Select-Object -Unique | ConvertTo-Json -Depth 100 -Compress)
-
 $delegatedFormCategoryGuids = @()
 foreach($category in $delegatedFormCategories) {
     try {
         $uri = ($script:PortalBaseUrl +"api/v1/delegatedformcategories/$category")
         $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false
+        $response = $response | Where-Object {$_.name.en -eq $category}
+        
         $tmpGuid = $response.delegatedFormCategoryGuid
         $delegatedFormCategoryGuids += $tmpGuid
         
@@ -386,12 +371,10 @@ foreach($category in $delegatedFormCategories) {
             name = @{"en" = $category};
         }
         $body = ConvertTo-Json -InputObject $body -Depth 100
-
         $uri = ($script:PortalBaseUrl +"api/v1/delegatedformcategories")
         $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $script:headers -ContentType "application/json" -Verbose:$false -Body $body
         $tmpGuid = $response.delegatedFormCategoryGuid
         $delegatedFormCategoryGuids += $tmpGuid
-
         Write-Information "HelloID Delegated Form category '$category' successfully created$(if ($script:debugLogging -eq $true) { ": " + $tmpGuid })"
     }
 }
@@ -404,7 +387,7 @@ $delegatedFormName = @'
 AzureAD Guest - Invite
 '@
 $tmpTask = @'
-{"name":"AzureAD Guest - Invite","script":"# your script here\r\n$account = [PSCustomObject]@{\r\n    invitedUserDisplayName = $givenName + \" \" + $lastName;\r\n    invitedUserEmailAddress = $email;\r\n    sendInvitationMessage = $true;\r\n    inviteRedirectUrl = \"https://portal.azure.com/\";\r\n}\r\n\r\n$connected = $true\r\ntry{\r\n    $baseUri = \"https://login.microsoftonline.com/\"\r\n    $authUri = $baseUri + \"$AADTenantID/oauth2/token\"\r\n\r\n    $body = @{\r\n        grant_type    = \"client_credentials\"\r\n        client_id     = \"$AADAppId\"\r\n        client_secret = \"$AADAppSecret\"\r\n        resource      = \"https://graph.microsoft.com\"\r\n    }\r\n\r\n    $Response = Invoke-RestMethod -Method Post -Uri $authUri -Body $body -ContentType \u0027application/x-www-form-urlencoded\u0027\r\n    $accessToken = $Response.access_token;\r\n\r\n    #Add the authorization header to the request\r\n    $authorization = @{\r\n        Authorization  = \"Bearer $accesstoken\";\r\n        \u0027Content-Type\u0027 = \"application/json\";\r\n        Accept         = \"application/json\";\r\n    }\r\n}catch{\r\n        Write-Verbose -Verbose \"Could not connect to AzureAD\"\r\n        $connected = $false             \r\n}\r\n\r\nif ($connected)\r\n{\r\n    $userExists = $false\r\n    try{\r\n        $userPrincipalName = $account.invitedUserEmailAddress.replace(\"@\",\"_\") + \"#EXT#@$AADtenantDomain\"\r\n        $userPrincipalName = [System.Web.HttpUtility]::UrlEncode($userPrincipalName)\r\n        Write-Verbose -Verbose \"Searching for AzureAD user with userPrincipalName \u0027$($userPrincipalName)\u0027..\"\r\n\r\n        $baseSearchUri = \"https://graph.microsoft.com/\"\r\n        $properties = @(\"id\",\"displayName\",\"userPrincipalName\")        \r\n        $searchUri = $baseSearchUri + \"v1.0/users/$userPrincipalName\" + \u0027?$select=\u0027 + ($properties -join \",\")\r\n        $azureADUser = Invoke-RestMethod -Uri $searchUri -Method Get -Headers $authorization -Verbose:$false\r\n        Write-Verbose -Verbose \"Found AzureAD user [$($azureADUser.userPrincipalName)]\"\r\n        $userExists = $true\r\n    }catch{\r\n        Write-Verbose -Verbose \"Could not find AzureAD user [$($account.invitedUserEmailAddress)]\"\r\n        $userExists = $false             \r\n    }\r\n\r\n    if($userExists -eq $false){\r\n        Write-Verbose -Verbose \"Inviting AzureAD user [$($account.invitedUserEmailAddress)] for domain $AADtenantDomain..\"\r\n        $baseCreateUri = \"https://graph.microsoft.com/\"\r\n        $createUri = $baseCreateUri + \"/v1.0/invitations\"\r\n        $body = $account | ConvertTo-Json -Depth 10\r\n\r\n        $response = Invoke-RestMethod -Uri $createUri -Method POST -Headers $authorization -Body $body -Verbose:$false\r\n        $aRef = $response.invitedUser.id\r\n        \r\n        $patchUri = $baseCreateUri + \"/v1.0/users/\" + $aRef\r\n        $patchbody = @{\r\n            CompanyName = $company\r\n            Department = $department\r\n            jobTitle = $title\r\n        }\r\n        Invoke-RestMethod -Uri $patchUri -Method PATCH -Headers $authorization -Body ($patchbody | ConvertTo-Json) -Verbose:$false\r\n        \r\n        $success = $True;\r\n               \r\n        Write-Information \" invitation $($account.invitedUserEmailAddress) successfully\";         \r\n    }else{\r\n        Write-Verbose -Verbose \"AzureAD user [$($azureADUser.userPrincipalName)] already exists as a Guest in domain $AADtenantDomain\"\r\n\r\n        $aRef = $azureADUser.id\r\n\r\n        $success = $True; \r\n        Write-Error \" $($azureADUser.userPrincipalName) already exists for this person. Skipped action and treated like\";       \r\n    }\r\n}","runInCloud":true}
+{"name":"AzureAD Guest - Invite","script":"# Set TLS to accept TLS, TLS 1.1 and TLS 1.2\r\n[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12\r\n\r\n$VerbosePreference = \u0027SilentlyContinue\u0027\r\n$InformationPreference = \"Continue\"\r\n$WarningPreference = \"Continue\"\r\n\r\n# set from Global Variables\r\n# $AADtenantDomain = \u0027enyoi.onmicrosoft.com\u0027\r\n# $AADtenantID = \u0027\u0027\r\n# $AADAppId = \u0027\u0027\r\n# $AADAppSecret = \u0027\u0027\r\n\r\n# variables configured in form\r\n#Change mapping here\r\n$invitation = [PSCustomObject]@{\r\n    invitedUserDisplayName  = $form.givenName + \" \" + $form.lastName;\r\n    invitedUserEmailAddress = $form.email;\r\n    sendInvitationMessage   = $true;\r\n    inviteRedirectUrl       = \"https://portal.azure.com/\";\r\n    invitedUserMessageInfo  = @{\r\n        # customizedMessageBody = \"Personalized message body.\"\r\n        messageLanguage = \"nl-NL\" # If the customizedMessageBody is specified, this property is ignored, and the message is sent using the customizedMessageBody. The language format should be in ISO 639. The default is en-US.\r\n    }\r\n}\r\n\r\n# # Optional, fields to updated on account created from invitation\r\n# $updateAccount = @{\r\n#     CompanyName = $form.company\r\n#     Department  = $form.department\r\n#     jobTitle    = $form.title\r\n# }\r\n\r\n#region functions\r\nfunction New-AuthorizationHeaders {\r\n    [CmdletBinding()]\r\n    [OutputType([System.Collections.Generic.Dictionary[[String], [String]]])]\r\n    param(\r\n        [parameter(Mandatory)]\r\n        [string]\r\n        $TenantId,\r\n\r\n        [parameter(Mandatory)]\r\n        [string]\r\n        $ClientId,\r\n\r\n        [parameter(Mandatory)]\r\n        [string]\r\n        $ClientSecret\r\n    )\r\n    try {\r\n        Write-Verbose \"Creating Access Token\"\r\n        $baseUri = \"https://login.microsoftonline.com/\"\r\n        $authUri = $baseUri + \"$TenantId/oauth2/token\"\r\n    \r\n        $body = @{\r\n            grant_type    = \"client_credentials\"\r\n            client_id     = \"$ClientId\"\r\n            client_secret = \"$ClientSecret\"\r\n            resource      = \"https://graph.microsoft.com\"\r\n        }\r\n    \r\n        $Response = Invoke-RestMethod -Method POST -Uri $authUri -Body $body -ContentType \u0027application/x-www-form-urlencoded\u0027\r\n        $accessToken = $Response.access_token\r\n    \r\n        #Add the authorization header to the request\r\n        Write-Verbose \u0027Adding Authorization headers\u0027\r\n\r\n        $headers = [System.Collections.Generic.Dictionary[[String], [String]]]::new()\r\n        $headers.Add(\u0027Authorization\u0027, \"Bearer $accesstoken\")\r\n        $headers.Add(\u0027Accept\u0027, \u0027application/json\u0027)\r\n        $headers.Add(\u0027Content-Type\u0027, \u0027application/json\u0027)\r\n        # Needed to filter on specific attributes (https://docs.microsoft.com/en-us/graph/aad-advanced-queries)\r\n        $headers.Add(\u0027ConsistencyLevel\u0027, \u0027eventual\u0027)\r\n\r\n        Write-Output $headers  \r\n    }\r\n    catch {\r\n        $PSCmdlet.ThrowTerminatingError($_)\r\n    }\r\n}\r\n\r\nfunction Resolve-HTTPError {\r\n    [CmdletBinding()]\r\n    param (\r\n        [Parameter(Mandatory,\r\n            ValueFromPipeline\r\n        )]\r\n        [object]$ErrorObject\r\n    )\r\n    process {\r\n        $httpErrorObj = [PSCustomObject]@{\r\n            FullyQualifiedErrorId = $ErrorObject.FullyQualifiedErrorId\r\n            MyCommand             = $ErrorObject.InvocationInfo.MyCommand\r\n            RequestUri            = $ErrorObject.TargetObject.RequestUri\r\n            ScriptStackTrace      = $ErrorObject.ScriptStackTrace\r\n            ErrorMessage          = \u0027\u0027\r\n        }\r\n        if ($ErrorObject.Exception.GetType().FullName -eq \u0027Microsoft.PowerShell.Commands.HttpResponseException\u0027) {\r\n            $httpErrorObj.ErrorMessage = $ErrorObject.ErrorDetails.Message\r\n        }\r\n        elseif ($ErrorObject.Exception.GetType().FullName -eq \u0027System.Net.WebException\u0027) {\r\n            $httpErrorObj.ErrorMessage = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()\r\n        }\r\n        Write-Output $httpErrorObj\r\n    }\r\n}\r\n\r\nfunction Resolve-MicrosoftGraphAPIErrorMessage {\r\n    [CmdletBinding()]\r\n    param (\r\n        [Parameter(Mandatory,\r\n            ValueFromPipeline\r\n        )]\r\n        [object]$ErrorObject\r\n    )\r\n    process {\r\n        try {\r\n            $errorObjectConverted = $ErrorObject | ConvertFrom-Json -ErrorAction Stop\r\n\r\n            if ($null -ne $errorObjectConverted.error_description) {\r\n                $errorMessage = $errorObjectConverted.error_description\r\n            }\r\n            elseif ($null -ne $errorObjectConverted.error) {\r\n                if ($null -ne $errorObjectConverted.error.message) {\r\n                    $errorMessage = $errorObjectConverted.error.message\r\n                    if ($null -ne $errorObjectConverted.error.code) { \r\n                        $errorMessage = $errorMessage + \" Error code: $($errorObjectConverted.error.code)\"\r\n                    }\r\n                }\r\n                else {\r\n                    $errorMessage = $errorObjectConverted.error\r\n                }\r\n            }\r\n            else {\r\n                $errorMessage = $ErrorObject\r\n            }\r\n        }\r\n        catch {\r\n            $errorMessage = $ErrorObject\r\n        }\r\n\r\n        Write-Output $errorMessage\r\n    }\r\n}\r\n#endregion functions\r\n\r\n# Create Guest invitation\r\ntry {\r\n    $headers = New-AuthorizationHeaders -TenantId $AADtenantID -ClientId $AADAppId -ClientSecret $AADAppSecret\r\n\r\n    Write-Verbose \"Creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Invitation object: $($invitation | ConvertTo-Json -Depth 10)\"\r\n\r\n    $baseUri = \"https://graph.microsoft.com/\"\r\n    $body = $invitation | ConvertTo-Json -Depth 10\r\n    $splatWebRequest = @{\r\n        Uri     = \"$baseUri/v1.0/invitations\"\r\n        Headers = $headers\r\n        Method  = \u0027POST\u0027\r\n        Body    = ([System.Text.Encoding]::UTF8.GetBytes($body))\r\n    }\r\n    $createInvitationResponse = $null\r\n    $createInvitationResponse = Invoke-RestMethod @splatWebRequest -Verbose:$false\r\n    Write-Information \"Successfully created invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress))\"\r\n\r\n    $Log = @{\r\n        Action            = \"CreateAccount\" # optional. ENUM (undefined = default) \r\n        System            = \"AzureActiveDirectory\" # optional (free format text) \r\n        Message           = \"Successfully created invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress))\" # required (free format text) \r\n        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n        TargetDisplayName = \"$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUserEmailAddress))\" # optional (free format text) \r\n        TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) \r\n    }\r\n    #send result back  \r\n    Write-Information -Tags \"Audit\" -MessageData $log\r\n}\r\ncatch {\r\n    # Clean up error variables\r\n    $verboseErrorMessage = $null\r\n    $auditErrorMessage = $null\r\n\r\n    $ex = $PSItem\r\n    if ( $($ex.Exception.GetType().FullName -eq \u0027Microsoft.PowerShell.Commands.HttpResponseException\u0027) -or $($ex.Exception.GetType().FullName -eq \u0027System.Net.WebException\u0027)) {\r\n        $errorObject = Resolve-HTTPError -Error $ex\r\n\r\n        $verboseErrorMessage = $errorObject.ErrorMessage\r\n\r\n        $auditErrorMessage = Resolve-MicrosoftGraphAPIErrorMessage -ErrorObject $errorObject.ErrorMessage\r\n    }\r\n\r\n    # If error message empty, fall back on $ex.Exception.Message\r\n    if ([String]::IsNullOrEmpty($verboseErrorMessage)) {\r\n        $verboseErrorMessage = $ex.Exception.Message\r\n    }\r\n    if ([String]::IsNullOrEmpty($auditErrorMessage)) {\r\n        $auditErrorMessage = $ex.Exception.Message\r\n    }\r\n\r\n    Write-Verbose \"Error at Line \u0027$($ex.InvocationInfo.ScriptLineNumber)\u0027: $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)\"\r\n\r\n    $Log = @{\r\n        Action            = \"CreateAccount\" # optional. ENUM (undefined = default) \r\n        System            = \"AzureActiveDirectory\" # optional (free format text) \r\n        Message           = \"Error creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Error message: $($auditErrorMessage)\" # required (free format text) \r\n        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n        TargetDisplayName = \"$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUserEmailAddress))\" # optional (free format text) \r\n        TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) \r\n    }\r\n    #send result back  \r\n    Write-Information -Tags \"Audit\" -MessageData $log\r\n\r\n    throw \"Error creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Error message: $($auditErrorMessage)\"\r\n}\r\n\r\n# # Optional: Update account created from invitation\r\n# try {\r\n#     Write-Verbose \"Updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Account object: $($updateAccount | ConvertTo-Json -Depth 10)\"\r\n\r\n#     $body = $updateAccount | ConvertTo-Json -Depth 10\r\n#     $splatWebRequest = @{\r\n#         Uri     = \"$baseUri/v1.0/users/$($createInvitationResponse.invitedUser.id)\"\r\n#         Headers = $headers\r\n#         Method  = \u0027PATCH\u0027\r\n#         Body    = ([System.Text.Encoding]::UTF8.GetBytes($body))\r\n#     }\r\n#     $updateAccountResponse = $null\r\n#     $updateAccountResponse = Invoke-RestMethod @splatWebRequest -Verbose:$false\r\n#     Write-Information \"Successfully updated account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))\"\r\n\r\n#     $Log = @{\r\n#         Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n#         System            = \"AzureActiveDirectory\" # optional (free format text) \r\n#         Message           = \"Successfully updated account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))\" # required (free format text) \r\n#         IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n#         TargetDisplayName = \"$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))\" # optional (free format text) \r\n#         TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) \r\n#     }\r\n#     #send result back  \r\n#     Write-Information -Tags \"Audit\" -MessageData $log\r\n# }\r\n# catch {\r\n#     # Clean up error variables\r\n#     $verboseErrorMessage = $null\r\n#     $auditErrorMessage = $null\r\n\r\n#     $ex = $PSItem\r\n#     if ( $($ex.Exception.GetType().FullName -eq \u0027Microsoft.PowerShell.Commands.HttpResponseException\u0027) -or $($ex.Exception.GetType().FullName -eq \u0027System.Net.WebException\u0027)) {\r\n#         $errorObject = Resolve-HTTPError -Error $ex\r\n\r\n#         $verboseErrorMessage = $errorObject.ErrorMessage\r\n\r\n#         $auditErrorMessage = Resolve-MicrosoftGraphAPIErrorMessage -ErrorObject $errorObject.ErrorMessage\r\n#     }\r\n\r\n#     # If error message empty, fall back on $ex.Exception.Message\r\n#     if ([String]::IsNullOrEmpty($verboseErrorMessage)) {\r\n#         $verboseErrorMessage = $ex.Exception.Message\r\n#     }\r\n#     if ([String]::IsNullOrEmpty($auditErrorMessage)) {\r\n#         $auditErrorMessage = $ex.Exception.Message\r\n#     }\r\n\r\n#     Write-Verbose \"Error at Line \u0027$($ex.InvocationInfo.ScriptLineNumber)\u0027: $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)\"\r\n\r\n#     $Log = @{\r\n#         Action            = \"UpdateAccount\" # optional. ENUM (undefined = default) \r\n#         System            = \"AzureActiveDirectory\" # optional (free format text) \r\n#         Message           = \"Error updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Error message: $($auditErrorMessage)\" # required (free format text) \r\n#         IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) \r\n#         TargetDisplayName = \"$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))\" # optional (free format text) \r\n#         TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) \r\n#     }\r\n#     #send result back  \r\n#     Write-Information -Tags \"Audit\" -MessageData $log\r\n\r\n#     throw \"Error updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Error message: $($auditErrorMessage)\"\r\n# }","runInCloud":false}
 '@ 
 
 Invoke-HelloIDDelegatedForm -DelegatedFormName $delegatedFormName -DynamicFormGuid $dynamicFormGuid -AccessGroups $delegatedFormAccessGroupGuids -Categories $delegatedFormCategoryGuids -UseFaIcon "True" -FaIcon "fa fa-user" -task $tmpTask -returnObject ([Ref]$delegatedFormRef) 

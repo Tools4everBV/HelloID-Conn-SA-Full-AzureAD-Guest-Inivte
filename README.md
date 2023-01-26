@@ -6,6 +6,7 @@ This HelloID Service Automation Delegated Form can Invite Guest to the Azure AD.
 ## Versioning
 | Version | Description | Date |
 | - | - | - |
+| 1.0.1   | Added audit logging and invitedUserMessageInfo options | 2023/01/26  |
 | 1.0.0   | Initial release | 2022/05/04  |
 
 <!-- Requirements -->
@@ -16,17 +17,20 @@ This script uses the Microsoft Graph API and requires an App Registration with A
  
 <!-- TABLE OF CONTENTS -->
 ## Table of Contents
-* [Description](#description)
-* [Requirements](#requirements)
-* [Introduction](#introduction)
-* [Getting the Azure AD graph API access](#getting-the-azure-ad-graph-api-access)
-  * [Application Registration](#application-registration)
-  * [Configuring App Permissions](#configuring-app-permissions)
-  * [Authentication and Authorization](#authentication-and-authorization)
-* [All-in-one PowerShell setup script](#all-in-one-powershell-setup-script)
-  * [Getting started](#getting-started)
-* [Post-setup configuration](#post-setup-configuration)
-* [Manual resources](#manual-resources)
+- [Description](#description)
+- [Versioning](#versioning)
+- [Requirements](#requirements)
+- [Table of Contents](#table-of-contents)
+- [Introduction](#introduction)
+- [Getting the Azure AD graph API access](#getting-the-azure-ad-graph-api-access)
+  - [Application Registration](#application-registration)
+  - [Configuring App Permissions](#configuring-app-permissions)
+  - [Authentication and Authorization](#authentication-and-authorization)
+- [All-in-one PowerShell setup script](#all-in-one-powershell-setup-script)
+  - [Getting started](#getting-started)
+- [Post-setup configuration](#post-setup-configuration)
+- [Getting help](#getting-help)
+- [HelloID Docs](#helloid-docs)
 
 
 ## Introduction
