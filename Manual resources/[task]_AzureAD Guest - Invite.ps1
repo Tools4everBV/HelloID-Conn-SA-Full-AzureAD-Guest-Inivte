@@ -1,82 +1,277 @@
-# your script here
-$account = [PSCustomObject]@{
-    invitedUserDisplayName = $givenName + " " + $lastName;
-    invitedUserEmailAddress = $email;
-    sendInvitationMessage = $true;
-    inviteRedirectUrl = "https://portal.azure.com/";
+# Set TLS to accept TLS, TLS 1.1 and TLS 1.2
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls -bor [Net.SecurityProtocolType]::Tls11 -bor [Net.SecurityProtocolType]::Tls12
+
+$VerbosePreference = 'SilentlyContinue'
+$InformationPreference = "Continue"
+$WarningPreference = "Continue"
+
+# set from Global Variables
+# $AADtenantDomain = 'enyoi.onmicrosoft.com'
+# $AADtenantID = ''
+# $AADAppId = ''
+# $AADAppSecret = ''
+
+# variables configured in form
+#Change mapping here
+$invitation = [PSCustomObject]@{
+    invitedUserDisplayName  = $form.givenName + " " + $form.lastName;
+    invitedUserEmailAddress = $form.email;
+    sendInvitationMessage   = $true;
+    inviteRedirectUrl       = "https://portal.azure.com/";
+    invitedUserMessageInfo  = @{
+        # customizedMessageBody = "Personalized message body."
+        messageLanguage = "nl-NL" # If the customizedMessageBody is specified, this property is ignored, and the message is sent using the customizedMessageBody. The language format should be in ISO 639. The default is en-US.
+    }
 }
 
-$connected = $true
-try{
-    $baseUri = "https://login.microsoftonline.com/"
-    $authUri = $baseUri + "$AADTenantID/oauth2/token"
+# # Optional, fields to updated on account created from invitation
+# $updateAccount = @{
+#     CompanyName = $form.company
+#     Department  = $form.department
+#     jobTitle    = $form.title
+# }
 
-    $body = @{
-        grant_type    = "client_credentials"
-        client_id     = "$AADAppId"
-        client_secret = "$AADAppSecret"
-        resource      = "https://graph.microsoft.com"
-    }
+#region functions
+function New-AuthorizationHeaders {
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.Dictionary[[String], [String]]])]
+    param(
+        [parameter(Mandatory)]
+        [string]
+        $TenantId,
 
-    $Response = Invoke-RestMethod -Method Post -Uri $authUri -Body $body -ContentType 'application/x-www-form-urlencoded'
-    $accessToken = $Response.access_token;
+        [parameter(Mandatory)]
+        [string]
+        $ClientId,
 
-    #Add the authorization header to the request
-    $authorization = @{
-        Authorization  = "Bearer $accesstoken";
-        'Content-Type' = "application/json";
-        Accept         = "application/json";
-    }
-}catch{
-        Write-Verbose -Verbose "Could not connect to AzureAD"
-        $connected = $false             
-}
-
-if ($connected)
-{
-    $userExists = $false
-    try{
-        $userPrincipalName = $account.invitedUserEmailAddress.replace("@","_") + "#EXT#@$AADtenantDomain"
-        $userPrincipalName = [System.Web.HttpUtility]::UrlEncode($userPrincipalName)
-        Write-Verbose -Verbose "Searching for AzureAD user with userPrincipalName '$($userPrincipalName)'.."
-
-        $baseSearchUri = "https://graph.microsoft.com/"
-        $properties = @("id","displayName","userPrincipalName")        
-        $searchUri = $baseSearchUri + "v1.0/users/$userPrincipalName" + '?$select=' + ($properties -join ",")
-        $azureADUser = Invoke-RestMethod -Uri $searchUri -Method Get -Headers $authorization -Verbose:$false
-        Write-Verbose -Verbose "Found AzureAD user [$($azureADUser.userPrincipalName)]"
-        $userExists = $true
-    }catch{
-        Write-Verbose -Verbose "Could not find AzureAD user [$($account.invitedUserEmailAddress)]"
-        $userExists = $false             
-    }
-
-    if($userExists -eq $false){
-        Write-Verbose -Verbose "Inviting AzureAD user [$($account.invitedUserEmailAddress)] for domain $AADtenantDomain.."
-        $baseCreateUri = "https://graph.microsoft.com/"
-        $createUri = $baseCreateUri + "/v1.0/invitations"
-        $body = $account | ConvertTo-Json -Depth 10
-
-        $response = Invoke-RestMethod -Uri $createUri -Method POST -Headers $authorization -Body $body -Verbose:$false
-        $aRef = $response.invitedUser.id
-        
-        $patchUri = $baseCreateUri + "/v1.0/users/" + $aRef
-        $patchbody = @{
-            CompanyName = $company
-            Department = $department
-            jobTitle = $title
+        [parameter(Mandatory)]
+        [string]
+        $ClientSecret
+    )
+    try {
+        Write-Verbose "Creating Access Token"
+        $baseUri = "https://login.microsoftonline.com/"
+        $authUri = $baseUri + "$TenantId/oauth2/token"
+    
+        $body = @{
+            grant_type    = "client_credentials"
+            client_id     = "$ClientId"
+            client_secret = "$ClientSecret"
+            resource      = "https://graph.microsoft.com"
         }
-        Invoke-RestMethod -Uri $patchUri -Method PATCH -Headers $authorization -Body ($patchbody | ConvertTo-Json) -Verbose:$false
-        
-        $success = $True;
-               
-        Write-Information " invitation $($account.invitedUserEmailAddress) successfully";         
-    }else{
-        Write-Verbose -Verbose "AzureAD user [$($azureADUser.userPrincipalName)] already exists as a Guest in domain $AADtenantDomain"
+    
+        $Response = Invoke-RestMethod -Method POST -Uri $authUri -Body $body -ContentType 'application/x-www-form-urlencoded'
+        $accessToken = $Response.access_token
+    
+        #Add the authorization header to the request
+        Write-Verbose 'Adding Authorization headers'
 
-        $aRef = $azureADUser.id
+        $headers = [System.Collections.Generic.Dictionary[[String], [String]]]::new()
+        $headers.Add('Authorization', "Bearer $accesstoken")
+        $headers.Add('Accept', 'application/json')
+        $headers.Add('Content-Type', 'application/json')
+        # Needed to filter on specific attributes (https://docs.microsoft.com/en-us/graph/aad-advanced-queries)
+        $headers.Add('ConsistencyLevel', 'eventual')
 
-        $success = $True; 
-        Write-Error " $($azureADUser.userPrincipalName) already exists for this person. Skipped action and treated like";       
+        Write-Output $headers  
+    }
+    catch {
+        $PSCmdlet.ThrowTerminatingError($_)
     }
 }
+
+function Resolve-HTTPError {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,
+            ValueFromPipeline
+        )]
+        [object]$ErrorObject
+    )
+    process {
+        $httpErrorObj = [PSCustomObject]@{
+            FullyQualifiedErrorId = $ErrorObject.FullyQualifiedErrorId
+            MyCommand             = $ErrorObject.InvocationInfo.MyCommand
+            RequestUri            = $ErrorObject.TargetObject.RequestUri
+            ScriptStackTrace      = $ErrorObject.ScriptStackTrace
+            ErrorMessage          = ''
+        }
+        if ($ErrorObject.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') {
+            $httpErrorObj.ErrorMessage = $ErrorObject.ErrorDetails.Message
+        }
+        elseif ($ErrorObject.Exception.GetType().FullName -eq 'System.Net.WebException') {
+            $httpErrorObj.ErrorMessage = [System.IO.StreamReader]::new($ErrorObject.Exception.Response.GetResponseStream()).ReadToEnd()
+        }
+        Write-Output $httpErrorObj
+    }
+}
+
+function Resolve-MicrosoftGraphAPIErrorMessage {
+    [CmdletBinding()]
+    param (
+        [Parameter(Mandatory,
+            ValueFromPipeline
+        )]
+        [object]$ErrorObject
+    )
+    process {
+        try {
+            $errorObjectConverted = $ErrorObject | ConvertFrom-Json -ErrorAction Stop
+
+            if ($null -ne $errorObjectConverted.error_description) {
+                $errorMessage = $errorObjectConverted.error_description
+            }
+            elseif ($null -ne $errorObjectConverted.error) {
+                if ($null -ne $errorObjectConverted.error.message) {
+                    $errorMessage = $errorObjectConverted.error.message
+                    if ($null -ne $errorObjectConverted.error.code) { 
+                        $errorMessage = $errorMessage + " Error code: $($errorObjectConverted.error.code)"
+                    }
+                }
+                else {
+                    $errorMessage = $errorObjectConverted.error
+                }
+            }
+            else {
+                $errorMessage = $ErrorObject
+            }
+        }
+        catch {
+            $errorMessage = $ErrorObject
+        }
+
+        Write-Output $errorMessage
+    }
+}
+#endregion functions
+
+# Create Guest invitation
+try {
+    $headers = New-AuthorizationHeaders -TenantId $AADtenantID -ClientId $AADAppId -ClientSecret $AADAppSecret
+
+    Write-Verbose "Creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Invitation object: $($invitation | ConvertTo-Json -Depth 10)"
+
+    $baseUri = "https://graph.microsoft.com/"
+    $body = $invitation | ConvertTo-Json -Depth 10
+    $splatWebRequest = @{
+        Uri     = "$baseUri/v1.0/invitations"
+        Headers = $headers
+        Method  = 'POST'
+        Body    = ([System.Text.Encoding]::UTF8.GetBytes($body))
+    }
+    $createInvitationResponse = $null
+    $createInvitationResponse = Invoke-RestMethod @splatWebRequest -Verbose:$false
+    Write-Information "Successfully created invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress))"
+
+    $Log = @{
+        Action            = "CreateAccount" # optional. ENUM (undefined = default) 
+        System            = "AzureActiveDirectory" # optional (free format text) 
+        Message           = "Successfully created invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress))" # required (free format text) 
+        IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
+        TargetDisplayName = "$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUserEmailAddress))" # optional (free format text) 
+        TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) 
+    }
+    #send result back  
+    Write-Information -Tags "Audit" -MessageData $log
+}
+catch {
+    # Clean up error variables
+    $verboseErrorMessage = $null
+    $auditErrorMessage = $null
+
+    $ex = $PSItem
+    if ( $($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
+        $errorObject = Resolve-HTTPError -Error $ex
+
+        $verboseErrorMessage = $errorObject.ErrorMessage
+
+        $auditErrorMessage = Resolve-MicrosoftGraphAPIErrorMessage -ErrorObject $errorObject.ErrorMessage
+    }
+
+    # If error message empty, fall back on $ex.Exception.Message
+    if ([String]::IsNullOrEmpty($verboseErrorMessage)) {
+        $verboseErrorMessage = $ex.Exception.Message
+    }
+    if ([String]::IsNullOrEmpty($auditErrorMessage)) {
+        $auditErrorMessage = $ex.Exception.Message
+    }
+
+    Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
+
+    $Log = @{
+        Action            = "CreateAccount" # optional. ENUM (undefined = default) 
+        System            = "AzureActiveDirectory" # optional (free format text) 
+        Message           = "Error creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Error message: $($auditErrorMessage)" # required (free format text) 
+        IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
+        TargetDisplayName = "$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUserEmailAddress))" # optional (free format text) 
+        TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) 
+    }
+    #send result back  
+    Write-Information -Tags "Audit" -MessageData $log
+
+    throw "Error creating invitation for $($invitation.invitedUserDisplayName) ($($invitation.invitedUserEmailAddress)). Error message: $($auditErrorMessage)"
+}
+
+# # Optional: Update account created from invitation
+# try {
+#     Write-Verbose "Updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Account object: $($updateAccount | ConvertTo-Json -Depth 10)"
+
+#     $body = $updateAccount | ConvertTo-Json -Depth 10
+#     $splatWebRequest = @{
+#         Uri     = "$baseUri/v1.0/users/$($createInvitationResponse.invitedUser.id)"
+#         Headers = $headers
+#         Method  = 'PATCH'
+#         Body    = ([System.Text.Encoding]::UTF8.GetBytes($body))
+#     }
+#     $updateAccountResponse = $null
+#     $updateAccountResponse = Invoke-RestMethod @splatWebRequest -Verbose:$false
+#     Write-Information "Successfully updated account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))"
+
+#     $Log = @{
+#         Action            = "UpdateAccount" # optional. ENUM (undefined = default) 
+#         System            = "AzureActiveDirectory" # optional (free format text) 
+#         Message           = "Successfully updated account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))" # required (free format text) 
+#         IsError           = $false # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
+#         TargetDisplayName = "$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))" # optional (free format text) 
+#         TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) 
+#     }
+#     #send result back  
+#     Write-Information -Tags "Audit" -MessageData $log
+# }
+# catch {
+#     # Clean up error variables
+#     $verboseErrorMessage = $null
+#     $auditErrorMessage = $null
+
+#     $ex = $PSItem
+#     if ( $($ex.Exception.GetType().FullName -eq 'Microsoft.PowerShell.Commands.HttpResponseException') -or $($ex.Exception.GetType().FullName -eq 'System.Net.WebException')) {
+#         $errorObject = Resolve-HTTPError -Error $ex
+
+#         $verboseErrorMessage = $errorObject.ErrorMessage
+
+#         $auditErrorMessage = Resolve-MicrosoftGraphAPIErrorMessage -ErrorObject $errorObject.ErrorMessage
+#     }
+
+#     # If error message empty, fall back on $ex.Exception.Message
+#     if ([String]::IsNullOrEmpty($verboseErrorMessage)) {
+#         $verboseErrorMessage = $ex.Exception.Message
+#     }
+#     if ([String]::IsNullOrEmpty($auditErrorMessage)) {
+#         $auditErrorMessage = $ex.Exception.Message
+#     }
+
+#     Write-Verbose "Error at Line '$($ex.InvocationInfo.ScriptLineNumber)': $($ex.InvocationInfo.Line). Error: $($verboseErrorMessage)"
+
+#     $Log = @{
+#         Action            = "UpdateAccount" # optional. ENUM (undefined = default) 
+#         System            = "AzureActiveDirectory" # optional (free format text) 
+#         Message           = "Error updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Error message: $($auditErrorMessage)" # required (free format text) 
+#         IsError           = $true # optional. Elastic reporting purposes only. (default = $false. $true = Executed action returned an error) 
+#         TargetDisplayName = "$($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id))" # optional (free format text) 
+#         TargetIdentifier  = $createInvitationResponse.invitedUser.id # optional (free format text) 
+#     }
+#     #send result back  
+#     Write-Information -Tags "Audit" -MessageData $log
+
+#     throw "Error updating account $($createInvitationResponse.invitedUserDisplayName) ($($createInvitationResponse.invitedUser.id)). Error message: $($auditErrorMessage)"
+# }
