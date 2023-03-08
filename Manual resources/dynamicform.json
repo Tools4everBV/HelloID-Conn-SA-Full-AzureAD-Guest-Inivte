@@ -1,48 +1,86 @@
 [
     {
-        "label":  "Details",
-        "fields":  [
-                       {
-                           "key":  "email",
-                           "templateOptions":  {
-                                                   "label":  "Email",
-                                                   "placeholder":  "user@domain.com",
-                                                   "required":  true
-                                               },
-                           "type":  "input",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "givenname",
-                           "templateOptions":  {
-                                                   "label":  "Givenname",
-                                                   "placeholder":  "John",
-                                                   "required":  true,
-                                                   "minLength":  2
-                                               },
-                           "type":  "input",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       },
-                       {
-                           "key":  "lastname",
-                           "templateOptions":  {
-                                                   "label":  "Last name",
-                                                   "placeholder":  "Poel",
-                                                   "required":  true,
-                                                   "minLength":  2
-                                               },
-                           "type":  "input",
-                           "summaryVisibility":  "Show",
-                           "requiresTemplateOptions":  true,
-                           "requiresKey":  true,
-                           "requiresDataSource":  false
-                       }
-                   ]
+        "key":  "email",
+        "templateOptions":  {
+                                "label":  "Email",
+                                "placeholder":  "user@domain.com",
+                                "required":  true
+                            },
+        "type":  "input",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
+    },
+    {
+        "key":  "givenname",
+        "templateOptions":  {
+                                "label":  "Givenname",
+                                "placeholder":  "John",
+                                "required":  true,
+                                "minLength":  2
+                            },
+        "type":  "input",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
+    },
+    {
+        "key":  "lastname",
+        "templateOptions":  {
+                                "label":  "Last name",
+                                "placeholder":  "Poel",
+                                "required":  true,
+                                "minLength":  2
+                            },
+        "type":  "input",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
+    },
+    {
+        "key":  "messageArea",
+        "templateOptions":  {
+                                "label":  "Personal Message",
+                                "rows":  3
+                            },
+        "className":  "textarea-resize-vert",
+        "type":  "textarea",
+        "summaryVisibility":  "Show",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
+    },
+    {
+        "key":  "groups",
+        "templateOptions":  {
+                                "label":  "Groups",
+                                "useObjects":  false,
+                                "useFilter":  true,
+                                "options":  [
+                                                "Option 1",
+                                                "Option 2",
+                                                "Option 3"
+                                            ],
+                                "useDataSource":  true,
+                                "dataSourceConfig":  {
+                                                         "dataSourceGuid":  "$dataSourceGuid_0",
+                                                         "input":  {
+                                                                       "propertyInputs":  [
+
+                                                                                          ]
+                                                                   }
+                                                     },
+                                "valueField":  "name",
+                                "textField":  "name"
+                            },
+        "type":  "multiselect",
+        "summaryVisibility":  "Show",
+        "textOrLabel":  "text",
+        "requiresTemplateOptions":  true,
+        "requiresKey":  true,
+        "requiresDataSource":  false
     }
 ]

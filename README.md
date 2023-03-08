@@ -6,6 +6,7 @@ This HelloID Service Automation Delegated Form can Invite Guest to the Azure AD.
 ## Versioning
 | Version | Description | Date |
 | - | - | - |
+| 1.1.0   | Added option to select groups to add the user to | 2023/03/08  |
 | 1.0.1   | Added audit logging and invitedUserMessageInfo options | 2023/01/26  |
 | 1.0.0   | Initial release | 2022/05/04  |
 

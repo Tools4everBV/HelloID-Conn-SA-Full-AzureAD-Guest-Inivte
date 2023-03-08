@@ -1,4 +1,4 @@
 {
     "name":  "AzureAD Guest - Invite",
-    "runInCloud":  false
+    "runInCloud":  true
 }
