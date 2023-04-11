@@ -98,7 +98,7 @@ After the all-in-one PowerShell script has run and created all the required reso
   <tr><td><strong>Variable name</strong></td><td><strong>Example value</strong></td><td><strong>Description</strong></td></tr>
   <tr><td>AADtenantID</td><td>Azure AD Tenant Id</td><td>Id of the Azure tenant</td></tr>
   <tr><td>AADAppId</td><td>Azure AD App Id</td><td>Id of the Azure app</td></tr>
-<tr><td>AADAppSecret</td><td>Azure AD App Secret</td><td>Secreat of the Azure app</td></tr>
+<tr><td>AADAppSecret</td><td>Azure AD App Secret</td><td>Secret of the Azure app</td></tr>
 </table>
 
 ## Getting help
